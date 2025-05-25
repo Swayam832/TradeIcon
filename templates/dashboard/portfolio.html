@@ -1,0 +1,430 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}My Portfolio - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">My Portfolio</h5>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addStockModal">
+            <i class="fas fa-plus me-1"></i> Add Stock
+        </button>
+    </div>
+    <div class="card-body">
+        {% if portfolio_items %}
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6>Total Investment</h6>
+                            <h4>${{ total_investment|default:"0.00"|floatformat:2 }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6>Current Value</h6>
+                            <h4>${{ current_value|default:"0.00"|floatformat:2 }}</h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6>Profit/Loss</h6>
+                            <h4 class="{% if profit_loss >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                ${{ profit_loss|default:"0.00"|floatformat:2 }}
+                            </h4>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6>Return</h6>
+                            <h4 class="{% if profit_loss_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ profit_loss_percent|default:"0.00"|floatformat:2 }}%
+                            </h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio Table -->
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Name</th>
+                            <th>Quantity</th>
+                            <th>Buy Price</th>
+                            <th>Current Price</th>
+                            <th>Total Cost</th>
+                            <th>Market Value</th>
+                            <th>Profit/Loss</th>
+                            <th>Return</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in portfolio_items %}
+                            {% with total_cost=item.quantity|multiply:item.buy_price|default:"0.00" %}
+                            {% with market_value=item.quantity|multiply:item.stock.current_price|default:"0.00" %}
+                            {% with profit=market_value|subtract:total_cost|default:"0.00" %}
+                            {% with return_percent=item.stock.current_price|subtract:item.buy_price|divide:item.buy_price|multiply:100|default:"0.00" %}
+                            <tr>
+                                <td><a href="{% url 'dashboard:stock_detail' item.stock.symbol %}">{{ item.stock.symbol }}</a></td>
+                                <td>{{ item.stock.name }}</td>
+                                <td>{{ item.quantity|default:"0" }}</td>
+                                <td>${{ item.buy_price|default:"0.00"|floatformat:2 }}</td>
+                                <td>${{ item.stock.current_price|default:"0.00"|floatformat:2 }}</td>
+                                <td>${{ total_cost|floatformat:2 }}</td>
+                                <td>${{ market_value|floatformat:2 }}</td>
+                                <td class="{% if profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    ${{ profit|floatformat:2 }}
+                                </td>
+                                <td class="{% if return_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ return_percent|floatformat:2 }}%
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary edit-stock" 
+                                            data-id="{{ item.id }}" 
+                                            data-symbol="{{ item.stock.symbol }}"
+                                            data-quantity="{{ item.quantity }}"
+                                            data-price="{{ item.buy_price }}">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger delete-stock" 
+                                            data-id="{{ item.id }}"
+                                            data-symbol="{{ item.stock.symbol }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Portfolio Charts -->
+            <div class="mt-4">
+                <h5>Portfolio Analysis</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="portfolioChart" height="300"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="performanceChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <p>You don't have any stocks in your portfolio yet. Click the "Add Stock" button to get started.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Stock Modal -->
+<div class="modal fade" id="addStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Stock to Portfolio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addStockForm" method="post" action="{% url 'dashboard:add_to_portfolio' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="symbol" class="form-label">Stock Symbol</label>
+                        <input type="text" class="form-control" id="symbol" name="symbol" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="buyPrice" class="form-label">Buy Price</label>
+                        <input type="number" class="form-control" id="buyPrice" name="buy_price" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="buyDate" class="form-label">Buy Date</label>
+                        <input type="date" class="form-control" id="buyDate" name="buy_date" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAddStock">Add Stock</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Stock Modal -->
+<div class="modal fade" id="editStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editStockForm" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" id="editStockId" name="stock_id">
+                    <div class="mb-3">
+                        <label class="form-label">Stock Symbol</label>
+                        <input type="text" class="form-control" id="editStockSymbol" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStockQuantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="editStockQuantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStockPrice" class="form-label">Buy Price</label>
+                        <input type="number" class="form-control" id="editStockPrice" name="buy_price" step="0.01" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmEditStock">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Stock Modal -->
+<div class="modal fade" id="deleteStockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Stock</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="deleteStockForm" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" id="deleteStockId" name="stock_id">
+                    <p>Are you sure you want to remove <strong><span id="deleteStockSymbol"></span></strong> from your portfolio?</p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteStock">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default date for add stock form
+    document.getElementById('buyDate').valueAsDate = new Date();
+
+    // Initialize charts if portfolio items exist
+    {% if portfolio_items %}
+    // Utility function to generate chart colors
+    function generateChartColors(count) {
+        const baseColors = [
+            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+            '#5a5c69', '#858796', '#6610f2', '#fd7e14', '#20c9a6'
+        ];
+        return Array.from({ length: count }, (_, i) => baseColors[i % baseColors.length]);
+    }
+
+    // Prepare portfolio allocation data
+    const portfolioData = {
+        labels: [],
+        values: [],
+        get total() {
+            return this.values.reduce((sum, val) => sum + parseFloat(val), 0);
+        }
+    };
+
+    {% for item in portfolio_items %}
+        portfolioData.labels.push('{{ item.stock.symbol }}');
+        portfolioData.values.push({{ item.quantity|multiply:item.stock.current_price|default:"0.00"|floatformat:2 }});
+    {% endfor %}
+
+    // Configure and create portfolio allocation chart
+    const createPortfolioChart = () => {
+        const ctx = document.getElementById('portfolioChart').getContext('2d');
+        return new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: portfolioData.labels,
+                datasets: [{
+                    data: portfolioData.values,
+                    backgroundColor: generateChartColors(portfolioData.labels.length)
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'right' },
+                    title: { 
+                        display: true,
+                        text: `Portfolio Allocation (Total: $${portfolioData.total.toFixed(2)})`,
+                        font: { size: 16 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.raw;
+                                const percentage = ((value / portfolioData.total) * 100).toFixed(1);
+                                return `${context.label}: $${value.toFixed(2)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // Prepare performance data
+    const performanceData = {
+        labels: portfolioData.labels,
+        returns: [],
+        colors: []
+    };
+
+    {% for item in portfolio_items %}
+        const returnValue = {{ item.stock.current_price|subtract:item.buy_price|divide:item.buy_price|multiply:100|default:"0.00"|floatformat:2 }};
+        performanceData.returns.push(returnValue);
+        performanceData.colors.push(returnValue >= 0 ? 'rgba(46,204,113,0.8)' : 'rgba(231,76,60,0.8)');
+    {% endfor %}
+
+    // Configure and create performance chart
+    const createPerformanceChart = () => {
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        return new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: performanceData.labels,
+                datasets: [{
+                    label: 'Return (%)',
+                    data: performanceData.returns,
+                    backgroundColor: performanceData.colors
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    title: { 
+                        display: true,
+                        text: 'Performance by Stock',
+                        font: { size: 16 }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => `${value}%`
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // Initialize both charts
+    const portfolioChart = createPortfolioChart();
+    const performanceChart = createPerformanceChart();
+    {% endif %}
+
+    // Form submission handlers
+    async function handleFormSubmission(form, successMessage = 'Operation successful') {
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                throw new Error(data.error || 'Operation failed');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert(error.message || 'An error occurred. Please try again.');
+        }
+    }
+
+    // Add Stock Form Submission
+    document.getElementById('confirmAddStock').addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = document.getElementById('addStockForm');
+        if (form.checkValidity()) {
+            handleFormSubmission(form, 'Stock added successfully');
+        } else {
+            form.reportValidity();
+        }
+    });
+
+    // Edit Stock Form Submission
+    document.getElementById('confirmEditStock').addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = document.getElementById('editStockForm');
+        const stockId = document.getElementById('editStockId').value;
+        form.action = `/dashboard/portfolio/${stockId}/edit/`;
+        
+        if (form.checkValidity()) {
+            handleFormSubmission(form, 'Stock updated successfully');
+        } else {
+            form.reportValidity();
+        }
+    });
+
+    // Delete Stock Form Submission
+    document.getElementById('confirmDeleteStock').addEventListener('click', function(e) {
+        e.preventDefault();
+        const form = document.getElementById('deleteStockForm');
+        const stockId = document.getElementById('deleteStockId').value;
+        form.action = `/dashboard/portfolio/${stockId}/delete/`;
+        handleFormSubmission(form, 'Stock deleted successfully');
+    });
+
+    // Modal Event Handlers
+    document.querySelectorAll('.edit-stock').forEach(button => {
+        button.addEventListener('click', function() {
+            document.getElementById('editStockId').value = this.dataset.id;
+            document.getElementById('editStockSymbol').value = this.dataset.symbol;
+            document.getElementById('editStockQuantity').value = this.dataset.quantity;
+            document.getElementById('editStockPrice').value = this.dataset.price;
+            new bootstrap.Modal(document.getElementById('editStockModal')).show();
+        });
+    });
+
+    document.querySelectorAll('.delete-stock').forEach(button => {
+        button.addEventListener('click', function() {
+            document.getElementById('deleteStockId').value = this.dataset.id;
+            document.getElementById('deleteStockSymbol').textContent = this.dataset.symbol;
+            new bootstrap.Modal(document.getElementById('deleteStockModal')).show();
+        });
+    });
+});
+</script>
+{% endblock %}

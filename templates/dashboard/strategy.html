@@ -1,0 +1,509 @@
+{% extends 'base.html' %}
+
+{% block title %}Trading Strategy - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Enhanced Pullback Strategy</h5>
+    </div>
+    <div class="card-body">
+        {% if stock %}
+            <h4>{{ stock.symbol }} - {{ stock.name }}</h4>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form id="strategyForm">
+                        <div class="mb-3">
+                            <label for="longMA" class="form-label">Long Moving Average</label>
+                            <input type="number" class="form-control" id="longMA" value="50" min="10" max="200">
+                        </div>
+                        <div class="mb-3">
+                            <label for="shortMA" class="form-label">Short Moving Average</label>
+                            <input type="number" class="form-control" id="shortMA" value="20" min="5" max="50">
+                        </div>
+                        <div class="mb-3">
+                            <label for="rsiPeriod" class="form-label">RSI Period</label>
+                            <input type="number" class="form-control" id="rsiPeriod" value="14" min="7" max="30">
+                        </div>
+                        <div class="mb-3">
+                            <label for="rsiOverbought" class="form-label">RSI Overbought Level</label>
+                            <input type="number" class="form-control" id="rsiOverbought" value="70" min="60" max="90">
+                        </div>
+                        <div class="mb-3">
+                            <label for="rsiOversold" class="form-label">RSI Oversold Level</label>
+                            <input type="number" class="form-control" id="rsiOversold" value="30" min="10" max="40">
+                        </div>
+                        <button type="button" class="btn btn-primary" id="runStrategy">Run Strategy</button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0">Strategy Description</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>The Enhanced Pullback Strategy combines moving averages and RSI to identify potential entry and exit points:</p>
+                            <ol>
+                                <li><strong>Buy Signal:</strong> When the short MA crosses above the long MA and RSI is below the oversold level, indicating a potential upward trend after a pullback.</li>
+                                <li><strong>Sell Signal:</strong> When the short MA crosses below the long MA and RSI is above the overbought level, indicating a potential downward trend after a rally.</li>
+                            </ol>
+                            <p>This strategy works best in trending markets and can help identify potential reversal points.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="strategyResults" style="display: none;">
+                <h5>Strategy Results</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="chart-container" style="position: relative; height:400px;">
+                            <canvas id="strategyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Performance Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table">
+                                    <tbody>
+                                        <tr>
+                                            <th>Total Trades</th>
+                                            <td id="totalTrades">0</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Winning Trades</th>
+                                            <td id="winningTrades">0</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Win Rate</th>
+                                            <td id="winRate">0%</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Profit/Loss</th>
+                                            <td id="profitLoss">$0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Max Drawdown</th>
+                                            <td id="maxDrawdown">0%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Current Signal</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="currentSignal">
+                                    <h4 id="signalText" class="text-center">No Signal</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Trade History</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="tradeHistoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Price</th>
+                                    <th>Profit/Loss</th>
+                                    <th>Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradeHistoryBody">
+                                <!-- Trade history will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Select a Stock</h5>
+                    <p>Please select a stock to run the strategy on:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="stockSearch" placeholder="Search by symbol or name">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">Search</button>
+                    </div>
+                    <div id="searchResults" class="mt-3"></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Strategy Description</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>The Enhanced Pullback Strategy combines moving averages and RSI to identify potential entry and exit points:</p>
+                            <ol>
+                                <li><strong>Buy Signal:</strong> When the short MA crosses above the long MA and RSI is below the oversold level, indicating a potential upward trend after a pullback.</li>
+                                <li><strong>Sell Signal:</strong> When the short MA crosses below the long MA and RSI is above the overbought level, indicating a potential downward trend after a rally.</li>
+                            </ol>
+                            <p>This strategy works best in trending markets and can help identify potential reversal points.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Stock search functionality
+        const searchButton = document.getElementById('searchButton');
+        if (searchButton) {
+            searchButton.addEventListener('click', function() {
+                const query = document.getElementById('stockSearch').value;
+                if (!query) return;
+                
+                fetch(`/api/stock/search/?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const resultsDiv = document.getElementById('searchResults');
+                        resultsDiv.innerHTML = '';
+                        
+                        if (data.stocks && data.stocks.length > 0) {
+                            const table = document.createElement('table');
+                            table.className = 'table table-hover';
+                            
+                            const thead = document.createElement('thead');
+                            thead.innerHTML = `
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Action</th>
+                                </tr>
+                            `;
+                            
+                            const tbody = document.createElement('tbody');
+                            data.stocks.forEach(stock => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${stock.symbol}</td>
+                                    <td>${stock.name}</td>
+                                    <td>
+                                        <a href="/strategy/${stock.symbol}/" class="btn btn-sm btn-primary">Select</a>
+                                    </td>
+                                `;
+                                tbody.appendChild(row);
+                            });
+                            
+                            table.appendChild(thead);
+                            table.appendChild(tbody);
+                            resultsDiv.appendChild(table);
+                        } else {
+                            resultsDiv.innerHTML = '<p>No stocks found matching your search.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error searching stocks:', error);
+                    });
+            });
+        }
+        
+        // Run strategy functionality
+        const runStrategyButton = document.getElementById('runStrategy');
+        if (runStrategyButton) {
+            runStrategyButton.addEventListener('click', function() {
+                const longMA = document.getElementById('longMA').value;
+                const shortMA = document.getElementById('shortMA').value;
+                const rsiPeriod = document.getElementById('rsiPeriod').value;
+                const rsiOverbought = document.getElementById('rsiOverbought').value;
+                const rsiOversold = document.getElementById('rsiOversold').value;
+                
+                // Show loading state
+                runStrategyButton.disabled = true;
+                runStrategyButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Running...';
+                
+                // In a real app, this would call an API endpoint with the parameters
+                // For demo purposes, we'll simulate a response after a delay
+                setTimeout(() => {
+                    document.getElementById('strategyResults').style.display = 'block';
+                    runStrategyButton.disabled = false;
+                    runStrategyButton.innerHTML = 'Run Strategy';
+                    
+                    // Simulate strategy results
+                    document.getElementById('totalTrades').textContent = '15';
+                    document.getElementById('winningTrades').textContent = '9';
+                    document.getElementById('winRate').textContent = '60%';
+                    document.getElementById('profitLoss').textContent = '$1,250.75';
+                    document.getElementById('maxDrawdown').textContent = '12.5%';
+                    
+                    const signalText = document.getElementById('signalText');
+                    signalText.textContent = 'BUY';
+                    signalText.className = 'text-center text-success';
+                    
+                    // Populate trade history
+                    const tradeHistoryBody = document.getElementById('tradeHistoryBody');
+                    tradeHistoryBody.innerHTML = `
+                        <tr>
+                            <td>2023-05-10</td>
+                            <td class="text-success">BUY</td>
+                            <td>$145.25</td>
+                            <td class="text-success">+$12.50</td>
+                            <td>7 days</td>
+                        </tr>
+                        <tr>
+                            <td>2023-04-25</td>
+                            <td class="text-danger">SELL</td>
+                            <td>$152.75</td>
+                            <td class="text-success">+$8.25</td>
+                            <td>12 days</td>
+                        </tr>
+                        <tr>
+                            <td>2023-04-10</td>
+                            <td class="text-success">BUY</td>
+                            <td>$140.50</td>
+                            <td class="text-danger">-$5.75</td>
+                            <td>5 days</td>
+                        </tr>
+                    `;
+                    
+                    // Create strategy chart
+                    const ctx = document.getElementById('strategyChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                            datasets: [
+                                {
+                                    label: 'Stock Price',
+                                    data: [145, 148, 152, 147, 155, 160, 157, 163, 170, 167, 175, 180],
+                                    borderColor: '#3498db',
+                                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true
+                                },
+                                {
+                                    label: 'Short MA',
+                                    data: [null, 147, 150, 149, 151, 157, 158, 160, 166, 168, 171, 177],
+                                    borderColor: '#e74c3c',
+                                    borderWidth: 2,
+                                    pointRadius: 0
+                                },
+                                {
+                                    label: 'Long MA',
+                                    data: [null, null, null, 148, 150, 153, 155, 158, 162, 165, 168, 172],
+                                    borderColor: '#2ecc71',
+                                    borderWidth: 2,
+                                    pointRadius: 0
+                                },
+                                {
+                                    label: 'Buy Signals',
+                                    data: [null, null, null, null, 155, null, null, 163, null, null, null, null],
+                                    backgroundColor: 'rgba(46, 204, 113, 0.8)',
+                                    borderColor: 'rgba(46, 204, 113, 0.8)',
+                                    pointRadius: 8,
+                                    pointStyle: 'triangle',
+                                    pointRotation: 0,
+                                    showLine: false
+                                },
+                                {
+                                    label: 'Sell Signals',
+                                    data: [null, null, null, null, null, null, 157, null, null, 167, null, null],
+                                    backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                    borderColor: 'rgba(231, 76, 60, 0.8)',
+                                    pointRadius: 8,
+                                    pointStyle: 'triangle',
+                                    pointRotation: 180,
+                                    showLine: false
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    grid: {
+                                        borderDash: [2, 5]
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '$' + value;
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.y !== null) {
+                                                label += '$' + context.parsed.y.toFixed(2);
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                },
+                                legend: {
+                                    labels: {
+                                        usePointStyle: true
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Generate more detailed trade history
+                    // Get existing trade history body reference
+                    const existingTradeHistoryBody = document.getElementById('tradeHistoryBody');
+                    tradeHistoryBody.innerHTML = '';
+                    
+                    // Sample trade data
+                    const trades = [
+                        { date: '2023-01-15', type: 'BUY', price: 145.25, profit: 0, duration: 0 },
+                        { date: '2023-02-22', type: 'SELL', price: 152.80, profit: 7.55, duration: 38 },
+                        { date: '2023-03-10', type: 'BUY', price: 148.30, profit: 0, duration: 0 },
+                        { date: '2023-04-05', type: 'SELL', price: 160.45, profit: 12.15, duration: 26 },
+                        { date: '2023-04-20', type: 'BUY', price: 165.75, profit: 0, duration: 0 },
+                        { date: '2023-05-12', type: 'SELL', price: 172.40, profit: 6.65, duration: 22 },
+                        { date: '2023-06-05', type: 'BUY', price: 157.30, profit: 0, duration: 0 },
+                        { date: '2023-07-18', type: 'SELL', price: 163.50, profit: 6.20, duration: 43 },
+                        { date: '2023-08-02', type: 'BUY', price: 170.15, profit: 0, duration: 0 },
+                        { date: '2023-09-10', type: 'SELL', price: 167.80, profit: -2.35, duration: 39 },
+                        { date: '2023-10-05', type: 'BUY', price: 168.90, profit: 0, duration: 0 },
+                        { date: '2023-11-15', type: 'SELL', price: 175.40, profit: 6.50, duration: 41 },
+                        { date: '2023-12-01', type: 'BUY', price: 178.25, profit: 0, duration: 0 },
+                        { date: '2023-12-20', type: 'SELL', price: 180.75, profit: 2.50, duration: 19 }
+                    ];
+                    
+                    trades.forEach(trade => {
+                        const row = document.createElement('tr');
+                        const isProfitable = trade.profit > 0;
+                        const profitClass = trade.type === 'BUY' ? '' : (isProfitable ? 'text-success' : 'text-danger');
+                        const typeClass = trade.type === 'BUY' ? 'text-success' : 'text-danger';
+                        
+                        row.innerHTML = `
+                            <td>${trade.date}</td>
+                            <td class="${typeClass}">${trade.type}</td>
+                            <td>$${trade.price.toFixed(2)}</td>
+                            <td class="${profitClass}">${trade.type === 'BUY' ? '-' : (isProfitable ? '+' : '') + '$' + Math.abs(trade.profit).toFixed(2)}</td>
+                            <td>${trade.type === 'BUY' ? '-' : trade.duration + ' days'}</td>
+                        `;
+                        
+                        tradeHistoryBody.appendChild(row);
+                    });
+                }, 1500);
+            });
+        }
+        
+        // Add RSI chart toggle functionality
+        const toggleRSIButton = document.createElement('button');
+        toggleRSIButton.className = 'btn btn-sm btn-outline-secondary mt-3';
+        toggleRSIButton.textContent = 'Show RSI Chart';
+        toggleRSIButton.id = 'toggleRSI';
+        
+        // Add the button after the strategy chart is displayed
+        document.getElementById('runStrategy').addEventListener('click', function() {
+            setTimeout(() => {
+                const chartContainer = document.querySelector('.chart-container');
+                if (chartContainer && !document.getElementById('toggleRSI')) {
+                    chartContainer.insertAdjacentElement('afterend', toggleRSIButton);
+                    
+                    // Create RSI chart container
+                    const rsiContainer = document.createElement('div');
+                    rsiContainer.className = 'chart-container mt-3';
+                    rsiContainer.style.position = 'relative';
+                    rsiContainer.style.height = '200px';
+                    rsiContainer.style.display = 'none';
+                    rsiContainer.id = 'rsiChartContainer';
+                    
+                    const rsiCanvas = document.createElement('canvas');
+                    rsiCanvas.id = 'rsiChart';
+                    rsiContainer.appendChild(rsiCanvas);
+                    
+                    chartContainer.insertAdjacentElement('afterend', rsiContainer);
+                    
+                    // Toggle RSI chart visibility
+                    toggleRSIButton.addEventListener('click', function() {
+                        const rsiContainer = document.getElementById('rsiChartContainer');
+                        if (rsiContainer.style.display === 'none') {
+                            rsiContainer.style.display = 'block';
+                            toggleRSIButton.textContent = 'Hide RSI Chart';
+                            
+                            // Create RSI chart
+                            const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+                            new Chart(rsiCtx, {
+                                type: 'line',
+                                data: {
+                                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                                    datasets: [
+                                        {
+                                            label: 'RSI',
+                                            data: [45, 58, 65, 40, 30, 62, 70, 55, 48, 72, 60, 52],
+                                            borderColor: '#9b59b6',
+                                            backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                                            borderWidth: 2,
+                                            fill: false
+                                        },
+                                        {
+                                            label: 'Overbought',
+                                            data: Array(12).fill(document.getElementById('rsiOverbought').value),
+                                            borderColor: 'rgba(231, 76, 60, 0.5)',
+                                            borderWidth: 1,
+                                            pointRadius: 0,
+                                            borderDash: [5, 5]
+                                        },
+                                        {
+                                            label: 'Oversold',
+                                            data: Array(12).fill(document.getElementById('rsiOversold').value),
+                                            borderColor: 'rgba(46, 204, 113, 0.5)',
+                                            borderWidth: 1,
+                                            pointRadius: 0,
+                                            borderDash: [5, 5]
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        x: {
+                                            grid: {
+                                                display: false
+                                            }
+                                        },
+                                        y: {
+                                            min: 0,
+                                            max: 100,
+                                            grid: {
+                                                borderDash: [2, 5]
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            rsiContainer.style.display = 'none';
+                            toggleRSIButton.textContent = 'Show RSI Chart';
+                        }
+                    });
+                }
+            }, 1600);
+        });
+    });
+</script>
+{% endblock %}

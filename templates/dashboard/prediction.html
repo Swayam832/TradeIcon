@@ -1,0 +1,450 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Prediction - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">AI-Powered Stock Prediction</h5>
+    </div>
+    <div class="card-body">
+        {% if stock %}
+            <h4>{{ stock.symbol }} - {{ stock.name }}</h4>
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form id="predictionForm">
+                        <div class="mb-3">
+                            <label for="predictionDays" class="form-label">Prediction Days</label>
+                            <select class="form-select" id="predictionDays">
+                                <option value="7">7 Days</option>
+                                <option value="14">14 Days</option>
+                                <option value="30" selected>30 Days</option>
+                                <option value="60">60 Days</option>
+                                <option value="90">90 Days</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="modelType" class="form-label">Model Type</label>
+                            <select class="form-select" id="modelType">
+                                <option value="lstm" selected>LSTM Neural Network</option>
+                                <option value="arima">ARIMA</option>
+                                <option value="prophet">Prophet</option>
+                                <option value="ensemble">Ensemble (Combined)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confidenceInterval" class="form-label">Confidence Interval</label>
+                            <select class="form-select" id="confidenceInterval">
+                                <option value="0.8">80%</option>
+                                <option value="0.9" selected>90%</option>
+                                <option value="0.95">95%</option>
+                                <option value="0.99">99%</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="runPrediction">Generate Prediction</button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h6 class="mb-0">Current Stock Information</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <p class="mb-1">Current Price:</p>
+                                    <h4>${{ stock.current_price|floatformat:2 }}</h4>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-1">Change:</p>
+                                    <h4 class="{% if stock.change >= 0 %}positive{% else %}negative{% endif %}">
+                                        {{ stock.change|floatformat:2 }} ({{ stock.change_percent|floatformat:2 }}%)
+                                    </h4>
+                                </div>
+                            </div>
+                            <hr>
+                            <p class="mb-1">Last Updated:</p>
+                            <p>{{ stock.updated_at|date:"F j, Y H:i" }}</p>
+                            <hr>
+                            <p class="mb-1">Model Description:</p>
+                            <p id="modelDescription">LSTM (Long Short-Term Memory) neural networks are specialized for sequence prediction problems and can learn long-term dependencies in time series data, making them ideal for stock price prediction.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="predictionResults" style="display: none;">
+                <h5>Prediction Results</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="chart-container" style="position: relative; height:400px;">
+                            <canvas id="predictionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Prediction Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <table class="table">
+                                    <tbody>
+                                        <tr>
+                                            <th>Current Price</th>
+                                            <td>${{ stock.current_price|floatformat:2 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Predicted Price (End of Period)</th>
+                                            <td id="endPrediction">$0.00</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Expected Change</th>
+                                            <td id="expectedChange">0%</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Confidence Level</th>
+                                            <td id="confidenceLevel">90%</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Model Accuracy</th>
+                                            <td id="modelAccuracy">0%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Recommendation</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="recommendation">
+                                    <h4 id="recommendationText" class="text-center">Generating...</h4>
+                                    <p id="recommendationReason" class="text-center"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Detailed Predictions</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="predictionTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Predicted Price</th>
+                                    <th>Lower Bound</th>
+                                    <th>Upper Bound</th>
+                                </tr>
+                            </thead>
+                            <tbody id="predictionTableBody">
+                                <!-- Prediction data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Select a Stock</h5>
+                    <p>Please select a stock to generate predictions:</p>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="stockSearch" placeholder="Search by symbol or name">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">Search</button>
+                    </div>
+                    <div id="searchResults" class="mt-3"></div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">About Stock Predictions</h6>
+                        </div>
+                        <div class="card-body">
+                            <p>Our AI-powered stock prediction system uses advanced machine learning models to forecast future stock prices based on historical data and market trends.</p>
+                            <p>Available models:</p>
+                            <ul>
+                                <li><strong>LSTM Neural Network:</strong> Specialized for sequence prediction problems.</li>
+                                <li><strong>ARIMA:</strong> Statistical model for time series forecasting.</li>
+                                <li><strong>Prophet:</strong> Facebook's time series forecasting procedure.</li>
+                                <li><strong>Ensemble:</strong> Combines multiple models for improved accuracy.</li>
+                            </ul>
+                            <p class="text-muted"><small>Note: All predictions are estimates and should not be the sole basis for investment decisions.</small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update model description when model type changes
+        const modelType = document.getElementById('modelType');
+        if (modelType) {
+            modelType.addEventListener('change', function() {
+                const modelDescription = document.getElementById('modelDescription');
+                switch (this.value) {
+                    case 'lstm':
+                        modelDescription.textContent = 'LSTM (Long Short-Term Memory) neural networks are specialized for sequence prediction problems and can learn long-term dependencies in time series data, making them ideal for stock price prediction.';
+                        break;
+                    case 'arima':
+                        modelDescription.textContent = 'ARIMA (AutoRegressive Integrated Moving Average) is a statistical model that uses time series data to predict future values based on past values and errors.';
+                        break;
+                    case 'prophet':
+                        modelDescription.textContent = 'Prophet is a procedure for forecasting time series data developed by Facebook. It works best with time series that have strong seasonal effects and several seasons of historical data.';
+                        break;
+                    case 'ensemble':
+                        modelDescription.textContent = 'Ensemble methods combine predictions from multiple models to improve accuracy and robustness, often outperforming any single model.';
+                        break;
+                }
+            });
+        }
+        
+        // Stock search functionality
+        const searchButton = document.getElementById('searchButton');
+        if (searchButton) {
+            searchButton.addEventListener('click', function() {
+                const query = document.getElementById('stockSearch').value;
+                if (!query) return;
+                
+                fetch(`/api/stock/search/?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const resultsDiv = document.getElementById('searchResults');
+                        resultsDiv.innerHTML = '';
+                        
+                        if (data.stocks && data.stocks.length > 0) {
+                            const table = document.createElement('table');
+                            table.className = 'table table-hover';
+                            
+                            const thead = document.createElement('thead');
+                            thead.innerHTML = `
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Name</th>
+                                    <th>Action</th>
+                                </tr>
+                            `;
+                            
+                            const tbody = document.createElement('tbody');
+                            data.stocks.forEach(stock => {
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                                    <td>${stock.symbol}</td>
+                                    <td>${stock.name}</td>
+                                    <td>
+                                        <a href="/prediction/${stock.symbol}/" class="btn btn-sm btn-primary">Select</a>
+                                    </td>
+                                `;
+                                tbody.appendChild(row);
+                            });
+                            
+                            table.appendChild(thead);
+                            table.appendChild(tbody);
+                            resultsDiv.appendChild(table);
+                        } else {
+                            resultsDiv.innerHTML = '<p>No stocks found matching your search.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error searching stocks:', error);
+                    });
+            });
+        }
+        
+        // Run prediction functionality
+        const runPredictionButton = document.getElementById('runPrediction');
+        if (runPredictionButton) {
+            runPredictionButton.addEventListener('click', function() {
+                const days = document.getElementById('predictionDays').value;
+                const model = document.getElementById('modelType').value;
+                const confidence = document.getElementById('confidenceInterval').value;
+                
+                // Show loading state
+                runPredictionButton.disabled = true;
+                runPredictionButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
+                
+                // In a real app, this would call an API endpoint with the parameters
+                // For demo purposes, we'll simulate a response after a delay
+                setTimeout(() => {
+                    document.getElementById('predictionResults').style.display = 'block';
+                    runPredictionButton.disabled = false;
+                    runPredictionButton.innerHTML = 'Generate Prediction';
+                    
+                    // Simulate prediction results
+                    document.getElementById('endPrediction').textContent = '$185.75';
+                    document.getElementById('expectedChange').textContent = '+5.2%';
+                    document.getElementById('confidenceLevel').textContent = confidence * 100 + '%';
+                    document.getElementById('modelAccuracy').textContent = '87.5%';
+                    
+                    const recommendationText = document.getElementById('recommendationText');
+                    const recommendationReason = document.getElementById('recommendationReason');
+                    recommendationText.textContent = 'BUY';
+                    recommendationText.className = 'text-center text-success';
+                    recommendationReason.textContent = 'The model predicts a positive trend with high confidence.';
+                    
+                    // Populate prediction table
+                    const predictionTableBody = document.getElementById('predictionTableBody');
+                    predictionTableBody.innerHTML = '';
+                    
+                    const today = new Date();
+                    const currentPrice = 176.50;
+                    const endPrice = 185.75;
+                    const step = (endPrice - currentPrice) / parseInt(days);
+                    
+                    for (let i = 0; i < parseInt(days); i++) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() + i + 1);
+                        
+                        const predictedPrice = currentPrice + (step * (i + 1));
+                        const lowerBound = predictedPrice * (1 - (0.02 * Math.sqrt(i + 1)));
+                        const upperBound = predictedPrice * (1 + (0.02 * Math.sqrt(i + 1)));
+                        
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${date.toLocaleDateString()}</td>
+                            <td>$${predictedPrice.toFixed(2)}</td>
+                            <td>$${lowerBound.toFixed(2)}</td>
+                            <td>$${upperBound.toFixed(2)}</td>
+                        `;
+                        predictionTableBody.appendChild(row);
+                    }
+                    
+                    // Create prediction chart
+                    const ctx = document.getElementById('predictionChart').getContext('2d');
+                    
+                    // Generate dates for x-axis
+                    const labels = [];
+                    const historicalData = [];
+                    const predictedData = [];
+                    const lowerBoundData = [];
+                    const upperBoundData = [];
+                    
+                    // Historical data (past 30 days)
+                    for (let i = 30; i > 0; i--) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() - i);
+                        labels.push(date.toLocaleDateString());
+                        
+                        // Generate some random historical data
+                        const randomFactor = 0.98 + (Math.random() * 0.04);
+                        historicalData.push(currentPrice * randomFactor);
+                        predictedData.push(null);
+                        lowerBoundData.
+                        upperBoundData.push(null);
+                    }
+                    
+                    // Current day
+                    labels.push(today.toLocaleDateString());
+                    historicalData.push(currentPrice);
+                    predictedData.push(currentPrice);
+                    lowerBoundData.push(currentPrice);
+                    upperBoundData.push(currentPrice);
+                    
+                    // Future predictions
+                    for (let i = 0; i < parseInt(days); i++) {
+                        const date = new Date(today);
+                        date.setDate(date.getDate() + i + 1);
+                        labels.push(date.toLocaleDateString());
+                        
+                        const predictedPrice = currentPrice + (step * (i + 1));
+                        const lowerBound = predictedPrice * (1 - (0.02 * Math.sqrt(i + 1)));
+                        const upperBound = predictedPrice * (1 + (0.02 * Math.sqrt(i + 1)));
+                        
+                        historicalData.push(null);
+                        predictedData.push(predictedPrice);
+                        lowerBoundData.push(lowerBound);
+                        upperBoundData.push(upperBound);
+                    }
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Historical Price',
+                                    data: historicalData,
+                                    borderColor: '#3498db',
+                                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                    borderWidth: 2,
+                                    pointRadius: 1,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Predicted Price',
+                                    data: predictedData,
+                                    borderColor: '#2ecc71',
+                                    borderWidth: 2,
+                                    pointRadius: 1,
+                                    fill: false
+                                },
+                                {
+                                    label: 'Lower Bound',
+                                    data: lowerBoundData,
+                                    borderColor: 'rgba(231, 76, 60, 0.5)',
+                                    borderWidth: 1,
+                                    pointRadius: 0,
+                                    fill: false,
+                                    borderDash: [5, 5]
+                                },
+                                {
+                                    label: 'Upper Bound',
+                                    data: upperBoundData,
+                                    borderColor: 'rgba(46, 204, 113, 0.5)',
+                                    borderWidth: 1,
+                                    pointRadius: 0,
+                                    fill: '-1',
+                                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                                    borderDash: [5, 5]
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    },
+                                    ticks: {
+                                        maxRotation: 45,
+                                        minRotation: 45
+                                    }
+                                },
+                                y: {
+                                    grid: {
+                                        borderDash: [2, 5]
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '$' + value;
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }, 2000);
+            });
+        }
+    });
+</script>
+{% endblock %}

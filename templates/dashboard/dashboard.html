@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}Dashboard - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Portfolio Summary</h5>
+                <a href="{% url 'dashboard:portfolio' %}" class="btn btn-sm btn-outline-light">View All</a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6>Total Investment</h6>
+                            <h3>${{ total_investment|floatformat:2 }}</h3>
+                        </div>
+                        <div>
+                            <h6>Current Value</h6>
+                            <h3>${{ current_value|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6>Profit/Loss</h6>
+                            <h3 class="{% if profit_loss >= 0 %}positive{% else %}negative{% endif %}">
+                                ${{ profit_loss|floatformat:2 }} ({{ profit_loss_percent|floatformat:2 }}%)
+                            </h3>
+                        </div>
+                        <div>
+                            <canvas id="portfolioChart" height="150"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Watchlist</h5>
+                <a href="{% url 'dashboard:watchlist' %}" class="btn btn-sm btn-outline-light">View All</a>
+            </div>
+            <div class="card-body">
+                {% if watchlists %}
+                    {% for watchlist in watchlists %}
+                        <h6>{{ watchlist.name }}</h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Name</th>
+                                        <th>Price</th>
+                                        <th>Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for stock in watchlist.stocks.all %}
+                                        <tr>
+                                            <td><a href="{% url 'dashboard:stock_detail' stock.symbol %}">{{ stock.symbol }}</a></td>
+                                            <td>{{ stock.name }}</td>
+                                            <td>${{ stock.current_price|floatformat:2 }}</td>
+                                            <td class="{% if stock.change >= 0 %}positive{% else %}negative{% endif %}">
+                                                {{ stock.change|floatformat:2 }} ({{ stock.change_percent|floatformat:2 }}%)
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>You don't have any watchlists yet. <a href="{% url 'dashboard:watchlist' %}">Create one</a>.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Trending Stocks</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for stock in trending_stocks %}
+                        <a href="{% url 'dashboard:stock_detail' stock.symbol %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ stock.symbol }}</h6>
+                                <small class="{% if stock.change_percent >= 0 %}positive{% else %}negative{% endif %}">
+                                    {{ stock.change_percent|floatformat:2 }}%
+                                </small>
+                            </div>
+                            <p class="mb-1">{{ stock.name }}</p>
+                            <small>${{ stock.current_price|floatformat:2 }}</small>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Latest News</h5>
+                <a href="{% url 'dashboard:news' %}" class="btn btn-sm btn-outline-light">View All</a>
+            </div>
+            <div class="card-body">
+                {% for news in latest_news %}
+                    <div class="mb-3">
+                        <h6><a href="{{ news.url }}" target="_blank">{{ news.title }}</a></h6>
+                        <p class="mb-1">{{ news.content|truncatechars:100 }}</p>
+                        <small class="text-muted">{{ news.source }} - {{ news.published_at|date:"F j, Y" }}</small>
+                    </div>
+                    {% if not forloop.last %}<hr>{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get the context of the canvas element
+        var ctx = document.getElementById('portfolioChart').getContext('2d');
+
+        // Safely parse Django variables as numbers
+        var totalInvestment = parseFloat("{{ total_investment|floatformat:2 }}");
+        var profitLoss = parseFloat("{{ profit_loss|floatformat:2 }}");
+
+        var backgroundColor = [
+            '#3498db',
+            profitLoss >= 0 ? '#28a745' : '#dc3545'
+        ];
+
+        var portfolioChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Investment', 'Profit/Loss'],
+                datasets: [{
+                    data: [totalInvestment, profitLoss],
+                    backgroundColor: backgroundColor,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}

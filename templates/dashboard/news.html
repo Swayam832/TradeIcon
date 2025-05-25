@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Market News - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Market News</h5>
+        <div class="input-group" style="max-width: 300px;">
+            <input type="text" class="form-control" id="newsSearch" placeholder="Search news...">
+            <button class="btn btn-outline-secondary" type="button" id="searchNewsButton">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="nav nav-tabs" id="news-tabs" role="tablist">
+                    <button class="nav-link active" id="all-news-tab" data-bs-toggle="tab" data-bs-target="#all-news" type="button" role="tab" aria-controls="all-news" aria-selected="true">All News</button>
+                    <button class="nav-link" id="market-news-tab" data-bs-toggle="tab" data-bs-target="#market-news" type="button" role="tab" aria-controls="market-news" aria-selected="false">Market</button>
+                    <button class="nav-link" id="economy-news-tab" data-bs-toggle="tab" data-bs-target="#economy-news" type="button" role="tab" aria-controls="economy-news" aria-selected="false">Economy</button>
+                    <button class="nav-link" id="company-news-tab" data-bs-toggle="tab" data-bs-target="#company-news" type="button" role="tab" aria-controls="company-news" aria-selected="false">Company</button>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group">
+                    <button type="button" class="btn btn-outline-secondary active" id="listViewBtn">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="gridViewBtn">
+                        <i class="fas fa-th-large"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="news-content">
+            <div class="tab-pane fade show active" id="all-news" role="tabpanel" aria-labelledby="all-news-tab">
+                <div id="news-list" class="list-view">
+                    {% for news in news_list %}
+                    <div class="news-item mb-4">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="news-date">{{ news.published_at|date:"F j, Y" }}</div>
+                                <div class="news-source">{{ news.source }}</div>
+                            </div>
+                            <div class="col-md-9">
+                                <h5 class="news-title">
+                                    <a href="{{ news.url }}" target="_blank">{{ news.title }}</a>
+                                </h5>
+                                <p class="news-content">{{ news.content|truncatewords:50 }}</p>
+                                {% if news.stock %}
+                                <div class="news-stock">
+                                    <a href="{% url 'dashboard:stock_detail' news.stock.symbol %}" class="badge bg-primary">{{ news.stock.symbol }}</a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="alert alert-info">No news articles found.</div>
+                    {% endfor %}
+                    
+                    <div class="pagination-container mt-4">
+                        <nav aria-label="News pagination">
+                            <ul class="pagination justify-content-center">
+                                {% if news_list.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1">&laquo; First</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ news_list.previous_page_number }}">Previous</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">&laquo; First</a>
+                                </li>
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">Previous</a>
+                                </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Page {{ news_list.number }} of {{ news_list.paginator.num_pages }}
+                                    </span>
+                                </li>
+                                
+                                {% if news_list.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ news_list.next_page_number }}">Next</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ news_list.paginator.num_pages }}">Last &raquo;</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">Next</a>
+                                </li>
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">Last &raquo;</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-pane fade" id="market-news" role="tabpanel" aria-labelledby="market-news-tab">
+                <div class="alert alert-info">Market news will be displayed here.</div>
+            </div>
+            
+            <div class="tab-pane fade" id="economy-news" role="tabpanel" aria-labelledby="economy-news-tab">
+                <div class="alert alert-info">Economy news will be displayed here.</div>
+            </div>
+            
+            <div class="tab-pane fade" id="company-news" role="tabpanel" aria-labelledby="company-news-tab">
+                <div class="alert alert-info">Company news will be displayed here.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle between list and grid view
+        const listViewBtn = document.getElementById('listViewBtn');
+        const gridViewBtn = document.getElementById('gridViewBtn');
+        const newsList = document.getElementById('news-list');
+        
+        listViewBtn.addEventListener('click', function() {
+            newsList.className = 'list-view';
+            listViewBtn.classList.add('active');
+            gridViewBtn.classList.remove('active');
+        });
+        
+        gridViewBtn.addEventListener('click', function() {
+            newsList.className = 'grid-view';
+            gridViewBtn.classList.add('active');
+            listViewBtn.classList.remove('active');
+        });
+        
+        // News search functionality
+        const searchNewsButton = document.getElementById('searchNewsButton');
+        const newsSearch = document.getElementById('newsSearch');
+        
+        searchNewsButton.addEventListener('click', function() {
+            const query = newsSearch.value.trim();
+            if (query) {
+                window.location.href = `/news/?search=${encodeURIComponent(query)}`;
+            }
+        });
+        
+        newsSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchNewsButton.click();
+            }
+        });
+    });
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .news-item {
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .news-date {
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .news-source {
+        font-weight: bold;
+        color: #444;
+        margin-top: 5px;
+    }
+    
+    .news-title a {
+        color: #333;
+        text-decoration: none;
+    }
+    
+    .news-title a:hover {
+        color: #007bff;
+    }
+    
+    .news-content {
+        color: #666;
+        margin-top: 10px;
+    }
+    
+    .grid-view .news-item {
+        display: inline-block;
+        width: calc(50% - 15px);
+        margin-right: 15px;
+        vertical-align: top;
+    }
+    
+    .grid-view .news-item:nth-child(2n) {
+        margin-right: 0;
+    }
+    
+    @media (max-width: 768px) {
+        .grid-view .news-item {
+            width: 100%;
+            margin-right: 0;
+        }
+    }
+</style>
+{% endblock %}

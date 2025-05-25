@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Search Stocks - TradeIcon{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Search Stocks</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{% url 'stocks:search' %}">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" placeholder="Search by symbol or name" name="q" value="{{ query }}">
+                <button class="btn btn-primary" type="submit">Search</button>
+            </div>
+        </form>
+        
+        {% if query %}
+            <h6>Search results for "{{ query }}":</h6>
+            {% if stocks %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Change</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stock in stocks %}
+                                <tr>
+                                    <td>{{ stock.symbol }}</td>
+                                    <td>{{ stock.name }}</td>
+                                    <td>${{ stock.current_price|floatformat:2 }}</td>
+                                    <td class="{% if stock.change >= 0 %}positive{% else %}negative{% endif %}">
+                                        {{ stock.change|floatformat:2 }} ({{ stock.change_percent|floatformat:2 }}%)
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'dashboard:stock_detail' stock.symbol %}" class="btn btn-sm btn-outline-primary">View</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p>No stocks found matching "{{ query }}".</p>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

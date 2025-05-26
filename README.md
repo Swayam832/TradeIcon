@@ -2,6 +2,7 @@
 TradeIcon is a comprehensive stock trading and analysis platform built with Django that offers real-time market data, portfolio management, technical analysis, and machine learning-based price predictions.
 
 🚀 Features
+
 🔹 Real-time Stock Tracking
 Live stock price updates using Yahoo Finance API
 
